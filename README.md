@@ -18,6 +18,6 @@ This project explores the relationship between public sentiment and stock price 
 - Visualization: Interactive plots for better understanding of trends and correlations.
 
 🛠 Technologies Used
-Python: Pandas, Seaborn, Matplotlib, NLTK, Requests
-APIs: NewsAPI, Alpha Vantage
-Libraries: SentimentIntensityAnalyzer (NLP)
+Python: Pandas, Seaborn, Matplotlib, NLTK, Requests </br>
+APIs: NewsAPI, Alpha Vantage </br>
+Libraries: SentimentIntensityAnalyzer (NLP) </br>
