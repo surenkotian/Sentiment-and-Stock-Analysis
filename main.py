@@ -65,7 +65,11 @@ def senti_score(headline):
 # Function to apply sentiment analysis to the news DataFrame
 def analyse_sentiment(news_df):
     news_df["sentiment_score"] = news_df["headline"].apply(senti_score)
-    return news_df
+    # Calculate the daily average sentiment score
+    daily_sentiment = news_df.groupby("published_date").agg(
+        daily_sentiment_score=pd.NamedAgg(column="sentiment_score", aggfunc="mean")
+    ).reset_index()
+    return daily_sentiment
 
 # Merge news and stock data based on the published date and stock data date
 def merge_data(news_df, stock_df):
@@ -82,24 +86,43 @@ def calculate_price_change(df):
 
 # Correlation analysis using Pearson's correlation coefficient
 def analyse_correlation(df):
-    correlation, p_value = pearsonr(df['sentiment_score'], df['price_change'])
+    correlation, p_value = pearsonr(df['daily_sentiment_score'], df['price_change'])
     print(f"Correlation: {correlation:.2f}, P-value: {p_value:.2f}")
+    statement = interpret_correlation(correlation, p_value)
+    print(statement)
+
+def interpret_correlation(correlation, p_value):
+    if abs(correlation) >= 0.3:
+        correlation_strength = "strong"
+    elif abs(correlation) >= 0.10:
+        correlation_strength = "moderate"
+    else:
+        correlation_strength = "weak"
+
+    if p_value < 0.05:
+        significance = "statistically significant"
+    else:
+        significance = "not statistically significant"
+
+    return f"The correlation between sentiment scores and stock prices is {correlation_strength}, and it is {significance}."
 
 # Plot a line graph comparing sentiment score and stock price over time
 def plot_line_graph(df, query):
     plt.figure(figsize=(10, 6))
-    plt.plot(df["date"], df["normalized_sentiment"], label="Sentiment Score", color="blue", marker='o')
-    plt.plot(df["date"], df["normalized_stock_price"], label="Stock Price", color="green", marker='x')
+    plt.plot(df["date"], df["normalized_sentiment"], color='blue', label='Sentiment Score', linestyle='-', linewidth=2)
+    plt.plot(df["date"], df["normalized_stock_price"], color='green', label='Stock Price', linestyle='-', linewidth=2,)
     plt.title(f"Normalized Sentiment Score vs Stock Price for {query}")
     plt.xlabel("Date")
     plt.ylabel("Normalized Value (0 to 100)")
     plt.legend()
     plt.grid(True)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
     plt.show()
 
 # Plot a scatter plot comparing sentiment score and price change
 def plot_scatter_graph(df, query):
-    sns.scatterplot(x="sentiment_score", y="price_change", data=df, alpha=0.7, hue="sentiment_score", palette="coolwarm")
+    sns.scatterplot(x="normalized_sentiment", y="price_change", data=df, alpha=0.7, hue="normalized_sentiment", palette="coolwarm")
     plt.title(f"Sentiment Score vs Price Change for {query}")
     plt.xlabel("Sentiment Score")
     plt.ylabel("Price Change (%)")
@@ -107,7 +130,7 @@ def plot_scatter_graph(df, query):
 
 # Main function that ties everything together
 def main():
-    NEWS_API = "26e68abbb46145e6a9b7dbfd2d062bf9"  # Replace with your own NewsAPI key
+    NEWS_API = "b46d0478ffca466d8d35a7582fe8bc3e"  # Replace with your own NewsAPI key
     STOCKS_API = "A598CR21LWX8I0WH"  # Replace with your own Alpha Vantage API key
     company = input('Enter the name of the company: ')
     symbol = input('Enter the symbol(of the company entered): ')
@@ -117,7 +140,7 @@ def main():
     # Fetch and process news data
     articles = fetch_news(NEWS_API, company, FROM_DATE, TO_DATE)
     news_df = process_data(articles)
-    news_df = analyse_sentiment(news_df)
+    daily_sentiment_df = analyse_sentiment(news_df)
 
     # Apply rolling mean for sentiment smoothing
     news_df["smoothed_sentiment"] = news_df["sentiment_score"].rolling(window=3).mean()
@@ -126,11 +149,11 @@ def main():
     stock_df = fetch_stocks(STOCKS_API, symbol)
 
     # Merge news and stock data
-    merged_df = merge_data(news_df, stock_df)
+    merged_df = pd.merge(daily_sentiment_df, stock_df, left_on="published_date", right_on="date", how="inner")
 
     # Normalize stock prices and smoothed sentiment scores
     merged_df["normalized_stock_price"] = normalize(merged_df["close"])
-    merged_df["normalized_sentiment"] = normalize(merged_df["smoothed_sentiment"].fillna(0))
+    merged_df["normalized_sentiment"] = normalize(merged_df["daily_sentiment_score"].fillna(0))
 
     # Calculate price change
     merged_df = calculate_price_change(merged_df)
