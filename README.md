@@ -1,4 +1,4 @@
-📊 Stock Sentiment Analysis
+📊 Stock Sentiment Analysis </br>
 This project explores the relationship between public sentiment and stock price movements by analyzing real-time news and stock data. The goal is to identify trends and patterns in how sentiment affects stock prices using Python and data visualization techniques.
 
 🔍 Overview
