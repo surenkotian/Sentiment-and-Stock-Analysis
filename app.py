@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
 import datetime
+import fpdf
 from fpdf import FPDF
-from io import BytesIO
 
 # Hardcoded API keys
 NEWS_API_KEY = "b46d0478ffca466d8d35a7582fe8bc3e"
@@ -155,11 +155,9 @@ def generate_pdf(merged_df, company):
         pdf.cell(50, 10, txt=f"{row['price_change']:.2f}", border=1)
         pdf.ln(10)
 
-    # Save PDF to buffer
-    pdf_buffer = BytesIO()
-    pdf.output(pdf_buffer)
-    pdf_buffer.seek(0)  # Reset buffer pointer to the beginning
-    return pdf_buffer
+    pdf_file = f"{company}_Sentiment_Stock_Analysis.pdf"
+    pdf.output(pdf_file)
+    return pdf_file
 
 # Streamlit App
 st.title("Sentiment and Stock Analysis Tool")
@@ -217,13 +215,8 @@ if st.button("Run Analysis"):
 
         # PDF Generation
         st.write("### Download PDF Report")
-        pdf_buffer = generate_pdf(merged_df, company)
-        st.download_button(
-            label="Download PDF Report",
-            data=pdf_buffer,
-            file_name=f"{company}_Sentiment_Stock_Analysis.pdf",
-            mime="application/pdf"
-        )
+        pdf_file = generate_pdf(merged_df, company)
+        st.download_button("Download PDF Report", data=open(pdf_file, "rb"), file_name=pdf_file, mime="application/pdf")
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
