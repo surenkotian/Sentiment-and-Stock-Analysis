@@ -1,7 +1,8 @@
 import streamlit as st
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
 import requests
 import pandas as pd
-from nltk.sentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
