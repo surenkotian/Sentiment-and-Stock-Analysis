@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
 import datetime
+from fpdf import FPDF
+from io import BytesIO
 
 # Hardcoded API keys
 NEWS_API_KEY = "b46d0478ffca466d8d35a7582fe8bc3e"
@@ -73,7 +75,6 @@ def senti_score(headline):
 # Function to apply sentiment analysis to the news DataFrame
 def analyse_sentiment(news_df):
     news_df["sentiment_score"] = news_df["headline"].apply(senti_score)
-    # Calculate the daily average sentiment score
     daily_sentiment = news_df.groupby("published_date").agg(
         daily_sentiment_score=pd.NamedAgg(column="sentiment_score", aggfunc="mean")
     ).reset_index()
@@ -88,8 +89,6 @@ def calculate_price_change(df):
     if 'close' in df.columns:
         df['price_change'] = df['close'].pct_change() * 100  # Calculate percentage change
         df['price_change'] = df['price_change'].fillna(0)  # Fill NaN with 0 for the first row
-    else:
-        print("Error: 'close' column not found in DataFrame.")
     return df
 
 # Correlation analysis using Pearson's correlation coefficient
@@ -110,53 +109,79 @@ def interpret_correlation(correlation, p_value):
 
 # Define plotting functions
 def plot_line_graph(df, company):
-    try:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.plot(df["date"], df["normalized_sentiment"], color='blue', label='Sentiment Score', linestyle='-', linewidth=2)
-        ax.plot(df["date"], df["normalized_stock_price"], color='green', label='Stock Price', linestyle='-', linewidth=2)
-        ax.set_title(f"Normalized Sentiment Score vs Stock Price for {company}")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Normalized Value (0 to 100)")
-        ax.legend()
-        ax.grid(True)
-        ax.tick_params(axis='x', rotation=45)
-        st.pyplot(fig)
-    except Exception as e:
-        st.error(f"Error plotting line graph: {e}")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(df["date"], df["normalized_sentiment"], color='blue', label='Sentiment Score', linestyle='-', linewidth=2)
+    ax.plot(df["date"], df["normalized_stock_price"], color='green', label='Stock Price', linestyle='-', linewidth=2)
+    ax.set_title(f"Normalized Sentiment Score vs Stock Price for {company}")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Normalized Value (0 to 100)")
+    ax.legend()
+    ax.grid(True)
+    ax.tick_params(axis='x', rotation=45)
+    st.pyplot(fig)
 
 def plot_scatter_graph(df, company):
-    try:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.scatterplot(x="normalized_sentiment", y="price_change", data=df, alpha=0.7, hue="normalized_sentiment", palette="coolwarm", ax=ax)
-        ax.set_title(f"Sentiment Score vs Price Change for {company}")
-        ax.set_xlabel("Sentiment Score")
-        ax.set_ylabel("Price Change (%)")
-        st.pyplot(fig)
-    except Exception as e:
-        st.error(f"Error plotting scatter graph: {e}")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.scatterplot(x="normalized_sentiment", y="price_change", data=df, alpha=0.7, hue="normalized_sentiment", palette="coolwarm", ax=ax)
+    ax.set_title(f"Sentiment Score vs Price Change for {company}")
+    ax.set_xlabel("Sentiment Score")
+    ax.set_ylabel("Price Change (%)")
+    st.pyplot(fig)
 
-# Streamlit app
-# Title
+# Function to generate PDF report
+def generate_pdf(merged_df, company):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    title = f"Sentiment and Stock Analysis Report for {company}"
+    pdf.cell(200, 10, txt=title, ln=True, align='C')
+
+    # Add Sentiment and Stock Analysis Data
+    pdf.ln(10)
+    pdf.cell(200, 10, txt="Analysis Summary", ln=True, align='L')
+
+    # Adding tables for sentiment and stock data
+    pdf.set_font("Arial", size=10)
+    pdf.ln(5)
+    pdf.cell(100, 10, txt="Date", border=1, align='C')
+    pdf.cell(50, 10, txt="Sentiment Score", border=1, align='C')
+    pdf.cell(50, 10, txt="Stock Price Change (%)", border=1, align='C')
+    pdf.ln(10)
+
+    for index, row in merged_df.iterrows():
+        pdf.cell(100, 10, txt=row['date'].strftime('%Y-%m-%d'), border=1)
+        pdf.cell(50, 10, txt=f"{row['normalized_sentiment']:.2f}", border=1)
+        pdf.cell(50, 10, txt=f"{row['price_change']:.2f}", border=1)
+        pdf.ln(10)
+
+    # Save PDF to buffer
+    pdf_buffer = BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)  # Reset buffer pointer to the beginning
+    return pdf_buffer
+
+# Streamlit App
 st.title("Sentiment and Stock Analysis Tool")
 
-# Sidebar Inputs
-st.sidebar.header("Inputs")
-st.sidebar.markdown("Provide the required details below.")
+# Main Screen Inputs
+st.header("Inputs")
+st.write("Provide the required details below.")
 
-# Company Details
-company = st.sidebar.text_input("Company Name", "Tesla", help="Enter the company name you want to analyze.")
-symbol = st.sidebar.text_input("Company Symbol", "TSLA", help="Enter the stock symbol for the company.")
+col1, col2 = st.columns(2)
 
-# Date Range
-today = datetime.date.today()
-default_start_date = today - datetime.timedelta(days=30)
-from_date = st.sidebar.date_input("From Date", value=default_start_date, help="Select the start date for analysis.")
-to_date = st.sidebar.date_input("To Date", value=today, help="Select the end date for analysis.")
+with col1:
+    company = st.text_input("Company Name", "Tesla", help="Enter the company name you want to analyze.")
+    symbol = st.text_input("Company Symbol", "TSLA", help="Enter the stock symbol for the company.")
 
-# Button to Run Analysis
-if st.sidebar.button("Run Analysis"):
+with col2:
+    today = datetime.date.today()
+    default_start_date = today - datetime.timedelta(days=30)
+    from_date = st.date_input("From Date", value=default_start_date, help="Select the start date for analysis.")
+    to_date = st.date_input("To Date", value=today, help="Select the end date for analysis.")
+
+if st.button("Run Analysis"):
     try:
-        st.sidebar.success("Analysis started!")
         st.write(f"Analyzing data for {company} ({symbol}) from {from_date} to {to_date}.")
         
         # Fetch and process news
@@ -177,11 +202,10 @@ if st.sidebar.button("Run Analysis"):
         correlation, p_value = pearsonr(merged_df['normalized_sentiment'], merged_df['price_change'])
         statement = interpret_correlation(correlation, p_value)
 
-        # Display correlation results prominently
+        # Display correlation results
         st.write("### Correlation Results")
         st.write(f"**Correlation:** {correlation:.2f}")
         st.write(f"**P-value:** {p_value:.2f}")
-        st.write("### Interpretation")
         st.markdown(statement)
 
         # Display graphs
@@ -190,6 +214,16 @@ if st.sidebar.button("Run Analysis"):
 
         st.write("### Scatter Plot")
         plot_scatter_graph(merged_df, company)
+
+        # PDF Generation
+        st.write("### Download PDF Report")
+        pdf_buffer = generate_pdf(merged_df, company)
+        st.download_button(
+            label="Download PDF Report",
+            data=pdf_buffer,
+            file_name=f"{company}_Sentiment_Stock_Analysis.pdf",
+            mime="application/pdf"
+        )
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

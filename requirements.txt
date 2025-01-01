@@ -1,6 +1,8 @@
+streamlit
 nltk
-pandas
 requests
+pandas
 matplotlib
 seaborn
+fpdf
 scipy
