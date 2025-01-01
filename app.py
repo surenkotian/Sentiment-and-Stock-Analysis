@@ -1,6 +1,7 @@
 import streamlit as st
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
+nltk.download('vader_lexicon')
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
