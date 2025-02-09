@@ -8,8 +8,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
 import datetime
-import fpdf
 from fpdf import FPDF
+import plotly.graph_objects as go
+
+# Set page config
+st.set_page_config(page_title="Sentiment Analysis Tool", layout="wide")
 
 # Hardcoded API keys
 NEWS_API_KEY = "b46d0478ffca466d8d35a7582fe8bc3e"
@@ -44,9 +47,10 @@ def fetch_stocks(symbol):
             data = json_data["Time Series (Daily)"]
             df = pd.DataFrame(data).T
             df.columns = ["open", "high", "low", "close", "volume"]
-            df = df[["close", "volume"]].reset_index().rename(columns={"index": "date"})
+            for col in ["open", "high", "low", "close", "volume"]:
+                df[col] = df[col].map(lambda x: float(x.get('4. close') if isinstance(x, dict) else x))
+            df = df.reset_index().rename(columns={"index": "date"})
             df["date"] = pd.to_datetime(df["date"])
-            df["close"] = df["close"].astype(float)
             return df.sort_values("date")
         else:
             raise Exception(f"Unexpected API response: {json_data.get('Error Message', json_data)}")
@@ -67,12 +71,12 @@ def process_data(news_article):
     df['published_date'] = pd.to_datetime(df['published_date'])
     return df
 
-# Sentiment analysis function to score the sentiment of headlines
+# Sentiment analysis function
 def senti_score(headline):
     sia = SentimentIntensityAnalyzer()
     return sia.polarity_scores(headline)['compound'] * 100
 
-# Function to apply sentiment analysis to the news DataFrame
+# Function to apply sentiment analysis
 def analyse_sentiment(news_df):
     news_df["sentiment_score"] = news_df["headline"].apply(senti_score)
     daily_sentiment = news_df.groupby("published_date").agg(
@@ -80,18 +84,18 @@ def analyse_sentiment(news_df):
     ).reset_index()
     return daily_sentiment
 
-# Merge news and stock data based on the published date and stock data date
+# Merge news and stock data
 def merge_data(news_df, stock_df):
     return pd.merge(news_df, stock_df, right_on='date', left_on="published_date", how='inner')
 
-# Calculate price change percentage for stock data
+# Calculate price change percentage
 def calculate_price_change(df):
     if 'close' in df.columns:
-        df['price_change'] = df['close'].pct_change() * 100  # Calculate percentage change
-        df['price_change'] = df['price_change'].fillna(0)  # Fill NaN with 0 for the first row
+        df['price_change'] = df['close'].pct_change() * 100
+        df['price_change'] = df['price_change'].fillna(0)
     return df
 
-# Correlation analysis using Pearson's correlation coefficient
+# Correlation analysis
 def interpret_correlation(correlation, p_value):
     if abs(correlation) >= 0.3:
         correlation_strength = "strong"
@@ -118,17 +122,37 @@ def plot_line_graph(df, company):
     ax.legend()
     ax.grid(True)
     ax.tick_params(axis='x', rotation=45)
+    plt.tight_layout()
     st.pyplot(fig)
 
 def plot_scatter_graph(df, company):
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.scatterplot(x="normalized_sentiment", y="price_change", data=df, alpha=0.7, hue="normalized_sentiment", palette="coolwarm", ax=ax)
+    sns.scatterplot(x="normalized_sentiment", y="price_change", data=df, alpha=0.7, palette="coolwarm", ax=ax)
     ax.set_title(f"Sentiment Score vs Price Change for {company}")
     ax.set_xlabel("Sentiment Score")
     ax.set_ylabel("Price Change (%)")
+    plt.tight_layout()
     st.pyplot(fig)
 
-# Function to generate PDF report
+def plot_candlestick_chart(df, company):
+    fig = go.Figure(data=[
+        go.Candlestick(
+            x=df['date'],
+            open=df['open'],
+            high=df['high'],
+            low=df['low'],
+            close=df['close'],
+            name='Candlestick'
+        )
+    ])
+    fig.update_layout(
+        title=f"Candlestick Chart for {company}",
+        xaxis_title="Date",
+        yaxis_title="Stock Price",
+        xaxis_rangeslider_visible=False
+    )
+    st.plotly_chart(fig)
+
 def generate_pdf(merged_df, company):
     pdf = FPDF()
     pdf.add_page()
@@ -137,11 +161,9 @@ def generate_pdf(merged_df, company):
     title = f"Sentiment and Stock Analysis Report for {company}"
     pdf.cell(200, 10, txt=title, ln=True, align='C')
 
-    # Add Sentiment and Stock Analysis Data
     pdf.ln(10)
     pdf.cell(200, 10, txt="Analysis Summary", ln=True, align='L')
 
-    # Adding tables for sentiment and stock data
     pdf.set_font("Arial", size=10)
     pdf.ln(5)
     pdf.cell(100, 10, txt="Date", border=1, align='C')
@@ -204,7 +226,7 @@ if st.button("Run Analysis"):
         st.write("### Correlation Results")
         st.write(f"**Correlation:** {correlation:.2f}")
         st.write(f"**P-value:** {p_value:.2f}")
-        st.markdown(statement)
+        st.write(statement)
 
         # Display graphs
         st.write("### Line Graph")
@@ -213,10 +235,19 @@ if st.button("Run Analysis"):
         st.write("### Scatter Plot")
         plot_scatter_graph(merged_df, company)
 
+        st.write("### Candlestick Chart")
+        plot_candlestick_chart(stock_df, company)
+
         # PDF Generation
         st.write("### Download PDF Report")
         pdf_file = generate_pdf(merged_df, company)
-        st.download_button("Download PDF Report", data=open(pdf_file, "rb"), file_name=pdf_file, mime="application/pdf")
+        with open(pdf_file, "rb") as f:
+            st.download_button(
+                "Download PDF Report",
+                data=f,
+                file_name=pdf_file,
+                mime="application/pdf"
+            )
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
