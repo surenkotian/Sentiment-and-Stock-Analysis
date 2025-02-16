@@ -251,3 +251,40 @@ if st.button("Run Analysis"):
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
+
+st.write("### Disclaimer")
+st.warning("This tool provides sentiment-based insights on stock movements and should not be considered financial advice.")
+
+with st.expander("About the Project"):
+    st.write("""
+    **Sentiment and Stock Analysis Tool**  
+    This project analyzes the sentiment of news headlines related to a company and 
+    correlates it with the company's stock price changes.  
+
+    **Features:**  
+    - Fetch news articles using NewsAPI  
+    - Perform sentiment analysis using VADER SentimentIntensityAnalyzer  
+    - Retrieve stock data from Alpha Vantage  
+    - Normalize and analyze stock prices and sentiment scores  
+    - Calculate correlation between sentiment and stock movements  
+    - Generate visualizations and downloadable reports  
+
+    **Technologies Used:**  
+    - Python  
+    - Streamlit  
+    - NLTK  
+    - Matplotlib & Seaborn  
+    - Alpha Vantage & NewsAPI  
+    - Plotly  
+    - FPDF  
+
+    **How to Use:**  
+    1. Enter the company name and stock symbol.  
+    2. Select the date range for analysis.  
+    3. Click "Run Analysis" to fetch data, analyze, and visualize trends.  
+
+    **Developed By:**  
+    Suren Kotian | Contact: surenkotian10@gmail.com
+    """)
+
+
